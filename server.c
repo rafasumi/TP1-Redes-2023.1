@@ -76,7 +76,7 @@ int parse_file(const char* message, char* response) {
   file_name[header_size] = '\0';
 
   char* file_content = malloc(content_size);
-  strncpy(file_content, header_end, content_size);
+  strcpy(file_content, header_end);
   file_content[content_size] = '\0';
 
   if (access(file_name, F_OK) == 0) {
@@ -135,21 +135,18 @@ int main(int argc, const char* argv[]) {
   if (client_sock == -1) {
     log_exit("accept");
   }
-  
+
   while (1) {
     memset(buffer, 0, BUFFER_SIZE);
-    size_t result = recv_stream(client_sock, buffer, BUFFER_SIZE);
-    if (result == -1) {
+    if (recv_stream(client_sock, buffer, BUFFER_SIZE) <= 0) {
       log_exit("recv");
-    } else if (result == 0) {
-      break;
     }
 
     if (strcmp(buffer, "exit") == 0) {
       printf("%s\n", buffer);
       char response[] = "connection closed\\end";
 
-      if (send_stream(client_sock, response, strlen(response)) == -1) {
+      if (send_stream(client_sock, response, strlen(response)) <= 0) {
         log_exit("send");
       }
 
@@ -157,7 +154,7 @@ int main(int argc, const char* argv[]) {
     } else {
       char response[BUFFER_SIZE];
       if (parse_file(buffer, response) == 0) {
-        if (send_stream(client_sock, response, strlen(response)) == -1) {
+        if (send_stream(client_sock, response, strlen(response)) <= 0) {
           log_exit("send");
         }
       } else {

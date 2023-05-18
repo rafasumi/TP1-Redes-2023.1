@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-char* valid_extensions[NUM_VALID_EXT] = {"txt", "c",   "cpp",
+char* valid_extensions[NUM_VALID_EXT] = {"txt", "cpp", "c",
                                          "py",  "tex", "java"};
 
 int send_stream(int socket, char* buffer, size_t len) {
@@ -13,15 +13,15 @@ int send_stream(int socket, char* buffer, size_t len) {
   size_t count;
   while (len) {
     count = send(socket, ptr, len, 0);
-    if (count < 0) {
-      return -1;
+    if (count <= 0) {
+      return count;
     }
 
     ptr += count;
     len -= count;
   }
 
-  return 0;
+  return 1;
 }
 
 int recv_stream(int socket, char* buffer, size_t len) {

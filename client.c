@@ -105,17 +105,14 @@ int main(int argc, const char* argv[]) {
 
     if (strcmp(input, "exit") == 0) {
       char message[] = "exit\\end";
-      if (send_stream(sock, message, strlen(message)) == -1) {
+      if (send_stream(sock, message, strlen(message)) <= 0) {
         log_exit("send");
       }
 
       char buffer[BUFFER_SIZE];
       memset(buffer, 0, BUFFER_SIZE);
-      size_t result = recv_stream(sock, buffer, BUFFER_SIZE);
-      if (result == -1) {
+      if (recv_stream(sock, buffer, BUFFER_SIZE) <= 0) {
         log_exit("recv");
-      } else if (result == 0) {
-        break;
       }
 
       printf("%s\n", buffer);
@@ -131,16 +128,13 @@ int main(int argc, const char* argv[]) {
       memset(buffer, 0, BUFFER_SIZE);
       build_message(buffer, selected_file);
 
-      if (send_stream(sock, buffer, strlen(buffer)) == -1) {
+      if (send_stream(sock, buffer, strlen(buffer)) <= 0) {
         log_exit("send");
       }
 
       memset(buffer, 0, BUFFER_SIZE);
-      size_t result = recv_stream(sock, buffer, BUFFER_SIZE);
-      if (result == -1) {
+      if (recv_stream(sock, buffer, BUFFER_SIZE) <= 0) {
         log_exit("recv");
-      } else if (result == 0) {
-        break;
       }
 
       printf("%s\n", buffer);
@@ -151,9 +145,15 @@ int main(int argc, const char* argv[]) {
     else if ((ptr = strstr(input, "select file ")) != NULL) {
       ptr += strlen("select file ");
 
-      // Se não houver nada após "select file ", então é um comando inválido
-      if (*ptr == '\0')
+      // Se não houver nada após "select file ", trata como um comando inválido
+      if (*ptr == '\0') {
+        char message[] = "\\end";
+        if (send_stream(sock, message, strlen(message)) <= 0) {
+          log_exit("send");
+        }
+
         break;
+      }
 
       if (access(ptr, F_OK) != 0) {
         printf("%s does not exist\n", ptr);
@@ -172,7 +172,7 @@ int main(int argc, const char* argv[]) {
     } else {
       // Recebeu comando desconhecido, envia "\end" para terminar conexão
       char message[] = "\\end";
-      if (send_stream(sock, message, strlen(message)) == -1) {
+      if (send_stream(sock, message, strlen(message)) <= 0) {
         log_exit("send");
       }
 
