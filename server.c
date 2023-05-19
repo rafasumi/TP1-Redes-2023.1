@@ -16,7 +16,7 @@ void usage(const char* bin) {
 }
 
 // Inicializa o objeto sockaddr_storage com base no protocolo informado como
-// argumento
+// argumento. Retorna 0 quando há sucesso e -1 caso contrário.
 int sockaddr_init(const char* protocol, const char* port_str,
                   struct sockaddr_storage* storage) {
   uint16_t port = (uint16_t)atoi(port_str); // unsigned short
@@ -44,6 +44,9 @@ int sockaddr_init(const char* protocol, const char* port_str,
   return 0;
 }
 
+// Casa a string "str" com alguma das extensões no array de extensões válidas.
+// Se houver casamento, retorna um ponteiro para a posição após "str". Caso
+// contrário, retorna NULL.
 char* match_extension(const char* str) {
   char* match;
   for (int i = 0; i < NUM_VALID_EXT; i++) {
@@ -57,12 +60,17 @@ char* match_extension(const char* str) {
   return match;
 }
 
+// Função auxiliar para fazer o parse do arquivo recebido, assumindo que a
+// mensagem recebida representa um arquivo. Em caso de sucesso, cria ou atualiza
+// o arquivo e retorna 0. Caso contrário, retorna -1.
 int parse_file(const char* message, char* response) {
+  // Se não há '.' na mensagem, é inválida
   char* header_end = strchr(message, '.');
   if (header_end == NULL) {
     return -1;
   }
 
+  // Se não casa com nenhuma das extensões, é inválida
   header_end = match_extension(header_end);
   if (header_end == NULL) {
     return -1;
@@ -79,6 +87,8 @@ int parse_file(const char* message, char* response) {
   strcpy(file_content, header_end);
   file_content[content_size] = '\0';
 
+  // Verifica se o arquivo presente no cabeçalho existe para determinar a
+  // resposta adequada
   if (access(file_name, F_OK) == 0) {
     sprintf(response, "file %s overwritten\\end", file_name);
   } else {
@@ -99,6 +109,8 @@ int main(int argc, const char* argv[]) {
   if (argc < 3)
     usage(argv[0]);
 
+  // Inicializa o objeto sockaddr_storage para dar bind em todos os endereços
+  // IP associados à interface
   struct sockaddr_storage storage;
   if (sockaddr_init(argv[1], argv[2], &storage) != 0) {
     usage(argv[0]);
@@ -112,8 +124,7 @@ int main(int argc, const char* argv[]) {
 
   // Opção que permite reaproveitar um socket em uso
   int enable = 1;
-  if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) !=
-      0) {
+  if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) != 0) {
     log_exit("setsockopt");
   }
 
@@ -126,7 +137,6 @@ int main(int argc, const char* argv[]) {
     log_exit("listen");
   }
 
-  char buffer[BUFFER_SIZE];
   struct sockaddr_storage client_storage;
   struct sockaddr* client_addr = (struct sockaddr*)(&client_storage);
   socklen_t client_addrlen = sizeof(client_storage);
@@ -136,6 +146,7 @@ int main(int argc, const char* argv[]) {
     log_exit("accept");
   }
 
+  char buffer[BUFFER_SIZE];
   while (1) {
     memset(buffer, 0, BUFFER_SIZE);
     if (recv_stream(client_sock, buffer, BUFFER_SIZE) <= 0) {
@@ -143,23 +154,28 @@ int main(int argc, const char* argv[]) {
     }
 
     if (strcmp(buffer, "exit") == 0) {
+      // Se a mensagem recebida é "exit", então deve fechar a conexão e
+      // finalizar a execução
+
       printf("%s\n", buffer);
       char response[] = "connection closed\\end";
 
-      if (send_stream(client_sock, response, strlen(response)) <= 0) {
+      if (send(client_sock, response, strlen(response), 0) != strlen(response)) {
         log_exit("send");
       }
 
       break;
     } else {
+      // Se a mensagem não é exit, tenta fazer parse como se fosse uma mensagem
+      // com arquivo. Se o parse falhar, trata como comando desconhecido e
+      // finaliza a execução
+
       char response[BUFFER_SIZE];
       if (parse_file(buffer, response) == 0) {
-        if (send_stream(client_sock, response, strlen(response)) <= 0) {
+        if (send(client_sock, response, strlen(response), 0) != strlen(response)) {
           log_exit("send");
         }
       } else {
-        // Mensagem não tinha formato válido, portanto era um comando
-        // desconhecido
         break;
       }
     }

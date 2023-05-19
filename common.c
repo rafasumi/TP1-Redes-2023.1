@@ -5,25 +5,15 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-char* valid_extensions[NUM_VALID_EXT] = {"txt", "cpp", "c",
-                                         "py",  "tex", "java"};
+// Array de extensões válidas. A extensão "cpp" precisa ser definida antes que a
+// extensão "c" no arquivo, pois, caso contrário, nenhum arquivo "cpp" é
+// reconhecido pelo servidor.
+char* valid_extensions[NUM_VALID_EXT] = {"txt", "cpp", "c", "py", "tex", "java"};
 
-int send_stream(int socket, char* buffer, size_t len) {
-  char* ptr = buffer;
-  size_t count;
-  while (len) {
-    count = send(socket, ptr, len, 0);
-    if (count <= 0) {
-      return count;
-    }
-
-    ptr += count;
-    len -= count;
-  }
-
-  return 1;
-}
-
+// Função usada para implementar uma versão mais "confiável" do recv.
+// Continuamente chama "recv" até que a sequência "\end" esteja contida no
+// buffer. Isso é necessário já que não é possível saber com antecedência qual é
+// a quantidade de bytes sendo enviada
 int recv_stream(int socket, char* buffer, size_t len) {
   char* ptr = buffer;
   size_t count;
@@ -35,6 +25,7 @@ int recv_stream(int socket, char* buffer, size_t len) {
 
     char* message_end = strstr(buffer, "\\end");
     if (message_end != NULL) {
+      // Remove a sequência "\end" do buffer
       memset(message_end, 0, strlen("\\end"));
       break;
     }

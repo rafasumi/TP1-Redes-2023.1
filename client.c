@@ -16,7 +16,8 @@ void usage(const char* bin) {
 }
 
 // Faz o parse do endereço passado como argumento e inicializa um struct do tipo
-// sockaddr_storage de acordo com o protocolo adequado
+// sockaddr_storage de acordo com o protocolo adequado. Retorna 0 quando há
+// sucesso e -1 caso contrário.
 int parse_address(const char* addr_str, const char* port_str,
                   struct sockaddr_storage* storage) {
   if (addr_str == NULL || port_str == NULL) {
@@ -50,6 +51,8 @@ int parse_address(const char* addr_str, const char* port_str,
   return -1;
 }
 
+// Função auxiliar usada para verificar se uma extensão é válida. Basicamente,
+// procura pela extensão no array de extensões válidas conhecidas.
 int is_valid_extension(const char* ext) {
   for (int i = 0; i < NUM_VALID_EXT; i++) {
     if (strcmp(ext, valid_extensions[i]) == 0)
@@ -59,13 +62,14 @@ int is_valid_extension(const char* ext) {
   return 0;
 }
 
+// Função auxiliar usada para construir a mensagem para enviar um arquivo na
+// rede. Concatena o título com o conteúdo e, depois, com a sequência "\end".
 void build_message(char* buffer, const char* selected_file) {
   strcpy(buffer, selected_file);
   char* end = strrchr(buffer, '\0');
 
   FILE* file_ptr = fopen(selected_file, "r");
-  size_t tail_size = strlen("\\end");
-  fread(end, 1, BUFFER_SIZE - strlen(buffer) - tail_size, file_ptr);
+  fread(end, 1, BUFFER_SIZE - strlen(buffer) - strlen("\\end"), file_ptr);
   fclose(file_ptr);
 
   char* file_end = strrchr(end, '\0');
@@ -76,19 +80,23 @@ int main(int argc, const char* argv[]) {
   if (argc < 3)
     usage(argv[0]);
 
+  // Faz o parse do endereço recebido como parâmetro
   struct sockaddr_storage storage;
   if (parse_address(argv[1], argv[2], &storage) != 0) {
     usage(argv[0]);
   }
 
+  // Cria um novo socket no endereço
   int sock;
   sock = socket(storage.ss_family, SOCK_STREAM, 0);
   if (sock == -1) {
     log_exit("socket");
   }
 
+  // Abre uma nova conexão no socket criado
   struct sockaddr* addr = (struct sockaddr*)(&storage);
   if (connect(sock, addr, sizeof(storage)) != 0) {
+    // A conexão pode falhar caso o servidor não esteja ouvindo
     log_exit("connect");
   }
 
@@ -104,8 +112,11 @@ int main(int argc, const char* argv[]) {
     input[strcspn(input, "\n")] = '\0';
 
     if (strcmp(input, "exit") == 0) {
+      // Se o input é "exit", envia a mensagem "exit\end" para o servidor e
+      // aguarda resposta. Depois de receber resposta, finaliza a execução.
+
       char message[] = "exit\\end";
-      if (send_stream(sock, message, strlen(message)) <= 0) {
+      if (send(sock, message, strlen(message), 0) != strlen(message)) {
         log_exit("send");
       }
 
@@ -119,6 +130,9 @@ int main(int argc, const char* argv[]) {
 
       break;
     } else if (strcmp(input, "send file") == 0) {
+      // Se o input é "send file", tenta enviar o arquivo seleciado caso tenha
+      // algum.
+
       if (selected_file[0] == 0) {
         printf("no file selected!\n");
         continue;
@@ -128,7 +142,7 @@ int main(int argc, const char* argv[]) {
       memset(buffer, 0, BUFFER_SIZE);
       build_message(buffer, selected_file);
 
-      if (send_stream(sock, buffer, strlen(buffer)) <= 0) {
+      if (send(sock, buffer, strlen(buffer), 0) != strlen(buffer)) {
         log_exit("send");
       }
 
@@ -141,25 +155,27 @@ int main(int argc, const char* argv[]) {
     }
     // A função strstr encontra a primeira ocorrência de um padrão em uma
     // string. Caso o padrão "select file " for encontrado, então o resto da
-    // string deve ser o nome do arquivo.
+    // string provavelmente é o nome do arquivo.
     else if ((ptr = strstr(input, "select file ")) != NULL) {
       ptr += strlen("select file ");
 
       // Se não houver nada após "select file ", trata como um comando inválido
       if (*ptr == '\0') {
         char message[] = "\\end";
-        if (send_stream(sock, message, strlen(message)) <= 0) {
+        if (send(sock, message, strlen(message), 0) != strlen(message)) {
           log_exit("send");
         }
 
         break;
       }
 
+      // Verifica se o arquivo informado existe
       if (access(ptr, F_OK) != 0) {
         printf("%s does not exist\n", ptr);
         continue;
       }
 
+      // Valida a extensão do arquivo
       char* ext = strrchr(ptr, '.');
       ext++;
       if (!is_valid_extension(ext)) {
@@ -170,9 +186,11 @@ int main(int argc, const char* argv[]) {
       strcpy(selected_file, ptr);
       printf("%s selected\n", selected_file);
     } else {
-      // Recebeu comando desconhecido, envia "\end" para terminar conexão
+      // Se o input passado não cai em nenhum dos casos anteriores, então é um
+      // comando desconhecido. Nesse caso, envia "\end" para servidor para que
+      // a conexão seja terminada
       char message[] = "\\end";
-      if (send_stream(sock, message, strlen(message)) <= 0) {
+      if (send(sock, message, strlen(message), 0) <= 0) {
         log_exit("send");
       }
 
