@@ -9,6 +9,7 @@
 
 #define MAX_PENDING 10
 
+// Retirado das aulas do professor Ítalo.
 void usage(const char* bin) {
   eprintf("Usage: %s <v4|v6> <server port>\n", bin);
   eprintf("Example: %s v4 51511\n", bin);
@@ -16,7 +17,8 @@ void usage(const char* bin) {
 }
 
 // Inicializa o objeto sockaddr_storage com base no protocolo informado como
-// argumento. Retorna 0 quando há sucesso e -1 caso contrário.
+// argumento. Retorna 0 quando há sucesso e -1 caso contrário. Retirado das
+// aulas do professor Ítalo.
 int sockaddr_init(const char* protocol, const char* port_str,
                   struct sockaddr_storage* storage) {
   uint16_t port = (uint16_t)atoi(port_str); // unsigned short
@@ -64,14 +66,15 @@ char* match_extension(const char* str) {
 // mensagem recebida representa um arquivo. Em caso de sucesso, cria ou atualiza
 // o arquivo e retorna 0. Caso contrário, retorna -1.
 int parse_file(const char* message, char* response) {
+  // Procura a última ocorrência do caractere '.'
+  char* header_end = strrchr(message, '.');
   // Se não há '.' na mensagem, é inválida
-  char* header_end = strchr(message, '.');
   if (header_end == NULL) {
     return -1;
   }
 
-  // Se não casa com nenhuma das extensões, é inválida
   header_end = match_extension(header_end);
+  // Se não casa com nenhuma das extensões, é inválida
   if (header_end == NULL) {
     return -1;
   }

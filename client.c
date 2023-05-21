@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+// Retirado das aulas do professor Ítalo.
 void usage(const char* bin) {
   eprintf("Usage: %s <server IP address> <server port>\n", bin);
   eprintf("Example IPv4: %s 127.0.0.1 51511\n", bin);
@@ -17,7 +18,7 @@ void usage(const char* bin) {
 
 // Faz o parse do endereço passado como argumento e inicializa um struct do tipo
 // sockaddr_storage de acordo com o protocolo adequado. Retorna 0 quando há
-// sucesso e -1 caso contrário.
+// sucesso e -1 caso contrário. Retirado das aulas do professor Ítalo.
 int parse_address(const char* addr_str, const char* port_str,
                   struct sockaddr_storage* storage) {
   if (addr_str == NULL || port_str == NULL) {
@@ -31,7 +32,7 @@ int parse_address(const char* addr_str, const char* port_str,
   port = htons(port); // host to network short
 
   struct in_addr inaddr4; // 32-bit IPv4 address
-  if (inet_pton(AF_INET, addr_str, &inaddr4)) {
+  if (inet_pton(AF_INET, addr_str, &inaddr4)) { // presentation to network
     struct sockaddr_in* addr4 = (struct sockaddr_in*)storage;
     addr4->sin_family = AF_INET;
     addr4->sin_port = port;
@@ -40,7 +41,7 @@ int parse_address(const char* addr_str, const char* port_str,
   }
 
   struct in6_addr inaddr6; // 128-bit IPv6 address
-  if (inet_pton(AF_INET6, addr_str, &inaddr6)) {
+  if (inet_pton(AF_INET6, addr_str, &inaddr6)) { // presentation to network
     struct sockaddr_in6* addr6 = (struct sockaddr_in6*)storage;
     addr6->sin6_family = AF_INET6;
     addr6->sin6_port = port;
@@ -177,7 +178,6 @@ int main(int argc, const char* argv[]) {
 
       // Valida a extensão do arquivo
       char* ext = strrchr(ptr, '.');
-      ext++;
       if (!is_valid_extension(ext)) {
         printf("%s not valid!\n", ptr);
         continue;
